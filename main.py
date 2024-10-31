@@ -4,7 +4,7 @@ import os
 
 pygame.init()
 
-SCREEN_WIDTH, SCREEN_HEIGHT = 1000, 600
+SCREEN_WIDTH, SCREEN_HEIGHT = 640, 480
 TILE_SIZE = 40
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
@@ -29,13 +29,6 @@ goal_img.fill(BLUE)
 box_on_goal_img = pygame.Surface((TILE_SIZE, TILE_SIZE))
 box_on_goal_img.fill((0, 128, 0))
 
-def find_goals(level):
-    goals = []
-    for y, row in enumerate(level):
-        for x, tile in enumerate(row):
-            if tile == '.':
-                goals.append((x, y))
-    return goals
 
 def load_levels(directory):
     levels = []
@@ -46,6 +39,16 @@ def load_levels(directory):
             print(level)
             levels.append(level)
     return levels
+
+
+def find_goals(level):
+    goals = []
+    for y, row in enumerate(level):
+        for x, tile in enumerate(row):
+            if tile == '.':
+                goals.append((x, y))
+    return goals
+
 
 def draw_level(level, goals):
     for y, row in enumerate(level):
@@ -61,6 +64,7 @@ def draw_level(level, goals):
             elif tile == '*':
                 screen.blit(box_on_goal_img, (x * TILE_SIZE, y * TILE_SIZE))
 
+
 def move_player(level, goals, dx, dy):
     new_level = [list(row) for row in level]
     player_pos = None
@@ -72,7 +76,7 @@ def move_player(level, goals, dx, dy):
                 break
         if player_pos:
             break
-    
+
     if player_pos:
         px, py = player_pos
         nx, ny = px + dx, py + dy
@@ -84,12 +88,13 @@ def move_player(level, goals, dx, dy):
                 new_level[py][px] = ' ' if level[py][px] == '@' else '.'
                 new_level[ny][nx] = '@'
                 new_level[nny][nnx] = '*' if level[nny][nnx] == '.' else '$'
-
+    
     for (gx, gy) in goals:
         if new_level[gy][gx] == ' ':
             new_level[gy][gx] = '.'
 
     return [''.join(row) for row in new_level]
+
 
 def check_win(level):
     for row in level:
@@ -97,20 +102,28 @@ def check_win(level):
             return False
     return True
 
+
 def main():
     levels = load_levels(LEVELS_DIR)
     current_level_index = 0
-    level = levels[current_level_index]
+    original_level = levels[current_level_index]
+    level = [row[:] for row in original_level]
     goals = find_goals(level)
+
+    move_history = []
+    
     clock = pygame.time.Clock()
 
     while True:
-        for event in pygame.event.get():
+        for event in pygame.event.get():    
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
 
             if event.type == pygame.KEYDOWN:
+                if event.key in (pygame.K_LEFT, pygame.K_RIGHT, pygame.K_UP, pygame.K_DOWN):
+                    move_history.append([row[:] for row in level])
+                
                 if event.key == pygame.K_LEFT:
                     level = move_player(level, goals, -1, 0)
                 if event.key == pygame.K_RIGHT:
@@ -119,20 +132,31 @@ def main():
                     level = move_player(level, goals, 0, -1)
                 if event.key == pygame.K_DOWN:
                     level = move_player(level, goals, 0, 1)
+                if event.key == pygame.K_u and move_history:
+                    level = move_history.pop()
+                if event.key == pygame.K_r:
+                    level = [row[:] for row in original_level]
+                    move_history.clear()
                 if event.key == pygame.K_n:
                     current_level_index = (current_level_index + 1) % len(levels)
-                    level = levels[current_level_index]
+                    original_level = levels[current_level_index]
+                    level = [row[:] for row in original_level]
                     goals = find_goals(level)
+                    move_history.clear()
                 if event.key == pygame.K_p:
                     current_level_index = (current_level_index - 1) % len(levels)
-                    level = levels[current_level_index]
+                    original_level = levels[current_level_index]
+                    level = [row[:] for row in original_level]
                     goals = find_goals(level)
+                    move_history.clear()
 
         if check_win(level):
             print("Уровень пройден!")
             current_level_index = (current_level_index + 1) % len(levels)
-            level = levels[current_level_index]
+            original_level = levels[current_level_index]
+            level = [row[:] for row in original_level]
             goals = find_goals(level)
+            move_history.clear()
 
         screen.fill(WHITE)
         draw_level(level, goals)
