@@ -3,15 +3,18 @@ import sys
 import os
 import time
 
+from src.load_images import load_images
+
 pygame.init()
 
-SCREEN_WIDTH, SCREEN_HEIGHT = 800, 480  # Увеличили ширину для отрисовки таймера и шагов
-TILE_SIZE = 40
+SCREEN_WIDTH, SCREEN_HEIGHT = 1000, 600
+TILE_SIZE = 36
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
-RED = (255, 0, 0)
-GREEN = (0, 255, 0)
-BLUE = (0, 0, 255)
+GRAY = (42, 42, 42)
+SAND = (220, 212, 171)
+THEME = "default"
+BACKCOLOR = GRAY if THEME == "dark" else SAND
 
 LEVELS_DIR = "levels"
 
@@ -20,25 +23,12 @@ pygame.display.set_caption("Sokoban")
 
 font = pygame.font.Font(None, 36)
 
-player_img = pygame.Surface((TILE_SIZE, TILE_SIZE))
-player_img.fill(RED)
-
-box_img = pygame.Surface((TILE_SIZE, TILE_SIZE))
-box_img.fill(GREEN)
-
-goal_img = pygame.Surface((TILE_SIZE, TILE_SIZE))
-goal_img.fill(BLUE)
-
-box_on_goal_img = pygame.Surface((TILE_SIZE, TILE_SIZE))
-box_on_goal_img.fill((0, 128, 0))
-
 def load_levels(directory):
     levels = []
     for filename in sorted(os.listdir(directory)):
         with open(os.path.join(directory, filename), 'r') as file:
             lines = file.readlines()
             level = [line for line in lines]
-            print(level)
             levels.append(level)
     return levels
 
@@ -52,18 +42,13 @@ def find_goals(level):
     return goals
 
 def draw_level(level, goals):
+    images = load_images(THEME)
     for y, row in enumerate(level):
         for x, tile in enumerate(row):
             if (x, y) in goals:
-                screen.blit(goal_img, (x * TILE_SIZE, y * TILE_SIZE))
-            if tile == '#':
-                pygame.draw.rect(screen, BLACK, (x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE))
-            elif tile == '@':
-                screen.blit(player_img, (x * TILE_SIZE, y * TILE_SIZE))
-            elif tile == '$':
-                screen.blit(box_img, (x * TILE_SIZE, y * TILE_SIZE))
-            elif tile == '*':
-                screen.blit(box_on_goal_img, (x * TILE_SIZE, y * TILE_SIZE))
+                screen.blit(images['.'], (x * TILE_SIZE, y * TILE_SIZE))
+            if sprite := images.get(tile, None):
+                screen.blit(sprite, (x * TILE_SIZE, y * TILE_SIZE))
 
 def move_player(level, goals, dx, dy):
     new_level = [list(row) for row in level]
@@ -187,7 +172,7 @@ def main():
             steps = 0
             start_time = time.time()
 
-        screen.fill(WHITE)
+        screen.fill(BACKCOLOR)
         draw_level(level, goals)
         draw_status(start_time, steps)
         pygame.display.flip()
