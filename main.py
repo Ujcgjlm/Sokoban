@@ -37,7 +37,7 @@ def find_goals(level):
     goals = []
     for y, row in enumerate(level):
         for x, tile in enumerate(row):
-            if tile == '.':
+            if tile == '.' or tile == '*' or tile == '+':
                 goals.append((x, y))
     return goals
 
@@ -56,7 +56,7 @@ def move_player(settings, level, goals, dx, dy):
     
     for y, row in enumerate(level):
         for x, char in enumerate(row):
-            if char == '@':
+            if char == '@' or char == '+':
                 player_pos = (x, y)
                 break
         if player_pos:

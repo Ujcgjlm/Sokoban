@@ -7,5 +7,6 @@ def load_images(theme):
         '$': pygame.image.load('./themes/' + theme + '/images/box.png').convert(),
         '.': pygame.image.load('./themes/' + theme + '/images/goal.png').convert(),
         '@': pygame.image.load('./themes/' + theme + '/images/player.png').convert(),
+        '+': pygame.image.load('./themes/' + theme + '/images/player.png').convert(),
         '*': pygame.image.load('./themes/' + theme + '/images/box_on_goal.png').convert(),
     }
