@@ -96,35 +96,99 @@ def draw_status(settings, start_time, steps):
     settings.screen.blit(timer_surface, (settings.SCREEN_WIDTH - 200, 20))
     settings.screen.blit(steps_surface, (settings.SCREEN_WIDTH - 200, 60))
 
-def draw_level_menu(settings, selected_level, completed_levels, total_levels):
+def draw_main_menu(settings, selected_button):
     settings.screen.fill(settings.COLORS['MENU_BG'])
-    
-    title_text = "Select Level"
-    title_surface = settings.title_font.render(title_text, True, settings.COLORS['HIGHLIGHT'])
-    shadow_surface = settings.title_font.render(title_text, True, settings.COLORS['BLACK'])
-    
-    title_x = (settings.SCREEN_WIDTH - title_surface.get_width()) // 2
-    settings.screen.blit(shadow_surface, (title_x + 3, 53))
-    settings.screen.blit(title_surface, (title_x, 50))
 
-    progress_text = f"Completed: {len(completed_levels)}/{total_levels}"
-    progress_surface = settings.font.render(progress_text, True, settings.COLORS['WHITE'])
-    settings.screen.blit(progress_surface, (50, 120))
+    title_surface = settings.title_font.render("Sokoban", True, settings.COLORS['HIGHLIGHT'])
+    title_rect = title_surface.get_rect(center=(settings.SCREEN_WIDTH//2, 100))
+    settings.screen.blit(title_surface, title_rect)
+
+    buttons = ["Уровни", "Выход"]
+
+    for i, text in enumerate(buttons):
+        rect = pygame.Rect(0, 0, 300, 60)
+        rect.center = (settings.SCREEN_WIDTH//2, 250 + i*100)
+        color = settings.COLORS['HIGHLIGHT'] if i == selected_button else settings.COLORS['BUTTON_BG']
+        
+        pygame.draw.rect(settings.screen, color, rect, border_radius=8)
+        text_surface = settings.font.render(text, True, settings.COLORS['WHITE'])
+        text_rect = text_surface.get_rect(center=rect.center)
+        settings.screen.blit(text_surface, text_rect)
+
+    pygame.display.flip()
+
+def main_menu(settings):
+    selected_button = 0
+    while True:
+        draw_main_menu(settings, selected_button)
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+                
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    selected_button = max(0, selected_button - 1)
+                elif event.key == pygame.K_DOWN:
+                    selected_button = min(1, selected_button + 1)
+                elif event.key == pygame.K_RETURN:
+                    if selected_button == 0:
+                        return
+                    elif selected_button == 1:
+                        pygame.quit()
+                        sys.exit()
+
+def level_selector(settings, levels):
+    total_levels = len(levels)
+    scroll_offset = 0
+    visible_levels = 6
+    selected_level = 0
+    completed_levels = load_progress(settings)
+
+    while True:
+        draw_level_menu(settings, selected_level, completed_levels, total_levels, scroll_offset)
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    if selected_level > 0:
+                        selected_level -= 1
+                        if selected_level < scroll_offset:
+                            scroll_offset = max(0, scroll_offset - 1)
+                elif event.key == pygame.K_DOWN:
+                    if selected_level < total_levels - 1:
+                        selected_level += 1
+                        if selected_level >= scroll_offset + visible_levels:
+                            scroll_offset = min(total_levels - visible_levels, scroll_offset + 1)
+                elif event.key == pygame.K_RETURN:
+                    return selected_level, completed_levels
+                elif event.key == pygame.K_ESCAPE:
+                    return -1, completed_levels
+
+def draw_level_menu(settings, selected_level, completed_levels, total_levels, scroll_offset):
+    settings.screen.fill(settings.COLORS['MENU_BG'])
+
+    title_surface = settings.title_font.render("Выберите уровень", True, settings.COLORS['HIGHLIGHT'])
+    title_rect = title_surface.get_rect(center=(settings.SCREEN_WIDTH//2, 50))
+    settings.screen.blit(title_surface, title_rect)
 
     list_width = 400
+    list_height = 360
     list_x = (settings.SCREEN_WIDTH - list_width) // 2
     pygame.draw.rect(settings.screen, settings.COLORS['BUTTON_BG'], 
-                    (list_x - 10, 190, list_width + 20, total_levels * 60 + 20), 
+                    (list_x - 10, 90, list_width + 20, list_height + 20), 
                     border_radius=12)
 
-    for i in range(total_levels):
-        btn_rect = pygame.Rect(
-            list_x,
-            200 + i * 60,
-            list_width,
-            50
-        )
-
+    visible_levels = min(6, total_levels)
+    for i in range(scroll_offset, min(scroll_offset + visible_levels, total_levels)):
+        idx = i - scroll_offset
+        btn_rect = pygame.Rect(list_x, 100 + idx * 60, list_width, 50)
+        
         if i == selected_level:
             pygame.draw.rect(settings.screen, settings.COLORS['HIGHLIGHT'], btn_rect, border_radius=8)
         else:
@@ -139,43 +203,18 @@ def draw_level_menu(settings, selected_level, completed_levels, total_levels):
             check_rect = pygame.Rect(btn_rect.right - 45, btn_rect.centery - 15, 30, 30)
             pygame.draw.circle(settings.screen, (0, 200, 0), check_rect.center, 12)
 
-    controls_text = "UP/DOWN: Navigate | ENTER: Select | ESC: Back"
+    if total_levels > visible_levels:
+        scroll_height = list_height * (visible_levels / total_levels)
+        scroll_y = 100 + (scroll_offset / total_levels) * list_height
+        pygame.draw.rect(settings.screen, settings.COLORS['HIGHLIGHT'],
+                        (list_x + list_width + 5, scroll_y, 8, scroll_height),
+                        border_radius=4)
+
+    controls_text = "↑/↓: Навигация | ENTER: Выбор | ESC: Назад"
     controls_surface = settings.font.render(controls_text, True, settings.COLORS['WHITE'])
     settings.screen.blit(controls_surface, (50, settings.SCREEN_HEIGHT - 60))
 
     pygame.display.flip()
-
-def level_selector(settings, levels):
-    total_levels = len(levels)
-    selected_level = 0
-    completed_levels = load_progress(settings)
-
-    while True:
-        draw_level_menu(settings, selected_level, completed_levels, total_levels)
-
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_UP:
-                    selected_level = max(0, selected_level - 1)
-                elif event.key == pygame.K_DOWN:
-                    selected_level = min(total_levels - 1, selected_level + 1)
-                elif event.key == pygame.K_RETURN:
-                    return selected_level, completed_levels
-                elif event.key == pygame.K_ESCAPE:
-                    return -1, completed_levels
-
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                mouse_x, mouse_y = pygame.mouse.get_pos()
-                list_x = (settings.SCREEN_WIDTH - 400) // 2
-                for i in range(total_levels):
-                    btn_y_start = 200 + i * 60
-                    if (list_x <= mouse_x <= list_x + 400 and 
-                        btn_y_start <= mouse_y <= btn_y_start + 50):
-                        return i, completed_levels
 
 def main():
     settings = Settings()
@@ -186,7 +225,12 @@ def main():
         return
 
     while True:
+        main_menu(settings)
+        
         current_level_index, completed_levels = level_selector(settings, levels)
+        if current_level_index == -1:
+            continue
+
         original_level = levels[current_level_index]
         level = [row[:] for row in original_level]
         goals = find_goals(level)
