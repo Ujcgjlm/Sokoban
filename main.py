@@ -124,7 +124,7 @@ def draw_level_menu(selected_level, completed_levels, total_levels):
     
     for i in range(total_levels):
         level_text = f"Level {i + 1} {'(Completed)' if i in completed_levels else ''}"
-        color = BLACK if i == selected_level else GRAY
+        color = WHITE if i == selected_level else GRAY
         level_surface = font.render(level_text, True, color)
         screen.blit(level_surface, (SCREEN_WIDTH // 2 - 100, 150 + i * 40))
     
