@@ -1,6 +1,6 @@
 from queue import PriorityQueue
 
-from level import Level
+from src.level import Level
 
 class AStarSolver:
     def __init__(self):

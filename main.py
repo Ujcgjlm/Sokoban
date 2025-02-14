@@ -5,6 +5,7 @@ import time
 from src.load_images import load_images
 from src.settings import Settings
 from src.level import Level
+from src.solver import AStarSolver
 
 class Renderer:
     def __init__(self, settings):
@@ -104,6 +105,7 @@ class Game:
         self.clock = pygame.time.Clock()
         self.levels = self.load_levels()
         self.completed_levels = self.load_progress()
+        self.solver = AStarSolver()
 
     def load_levels(self):
         if not os.path.exists(self.settings.LEVELS_DIR):
@@ -187,6 +189,41 @@ class Game:
                         return -1
         return -1
 
+    def animate_solution(self, level, solution, move_history):
+        if not solution:
+            print("\nРешение не найдено!")
+            return
+
+        print(f"\nНайдено решение из {len(solution)} ходов")
+        animation_delay = 200  # миллисекунды
+        last_move_time = 0
+
+        solution_index = 0
+        while solution_index < len(solution):
+            current_time = pygame.time.get_ticks()
+            
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    return False
+                if event.type == pygame.KEYDOWN:
+                    if event.key in (pygame.K_ESCAPE, pygame.K_s):
+                        return True
+
+            if current_time - last_move_time > animation_delay:
+                dx, dy = solution[solution_index]
+                move_history.append([row[:] for row in level.data])
+                level.move_player(dx, dy)
+                solution_index += 1
+                last_move_time = current_time
+
+            self.settings.screen.fill(self.settings.get_backcolor())
+            self.renderer.draw_level(level)
+            self.renderer.draw_status(time.time(), move_history)  # Используем текущее время, так как это анимация
+            pygame.display.flip()
+            self.clock.tick(60)
+
+        return True
+
     def play_level(self, level_index):
         level = Level(self.levels[level_index])
         move_history = []
@@ -222,7 +259,6 @@ class Game:
                     level.data = move_history.pop()
                     level.find_player()
                     level.moves_count -= 1
-                    # level.print_board()
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -233,6 +269,11 @@ class Game:
                         level = Level(self.levels[level_index])
                         move_history.clear()
                         start_time = time.time()
+                    elif event.key == pygame.K_s:
+                        print("\nЗапуск солвера...")
+                        solution = self.solver.solve(Level(level.data))
+                        if not self.animate_solution(level, solution, move_history):
+                            return False
                     elif event.key == pygame.K_t:
                         theme = "dark" if self.settings.current_theme == "default" else "default"
                         print(f"\nСмена темы на: {theme}")
