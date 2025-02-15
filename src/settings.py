@@ -20,15 +20,12 @@ class Settings:
         self.SAVE_FILE = "progress.dat"
         self.screen = pygame.display.set_mode((self.SCREEN_WIDTH, self.SCREEN_HEIGHT))
 
-        font_path = os.path.join("fonts", "arial.ttf")
-        bold_font_path = os.path.join("fonts", "arialbd.ttf")
-        try:
-            self.font = pygame.font.Font(font_path, 32)
-            self.title_font = pygame.font.Font(bold_font_path, 48)
-        except FileNotFoundError:
-            print("Font files not found, using system fonts")
-            self.font = pygame.font.SysFont("Arial", 32)
-            self.title_font = pygame.font.SysFont("Arial", 48, bold=True)
+        # Инициализируем подсистему шрифтов pygame
+        pygame.font.init()
+        
+        # Используем системные шрифты
+        self.font = pygame.font.SysFont("Arial", 32)
+        self.title_font = pygame.font.SysFont("Arial", 48, bold=True)
     
     def get_backcolor(self):
         return self.COLORS['GRAY'] if self.current_theme == "dark" else self.COLORS['SAND']
