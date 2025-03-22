@@ -3,8 +3,8 @@ import os
 
 class Settings:
     def __init__(self):
-        self.SCREEN_WIDTH = 1000
-        self.SCREEN_HEIGHT = 600
+        self.SCREEN_WIDTH = 1200
+        self.SCREEN_HEIGHT = 800
         self.TILE_SIZE = 36
         self.COLORS = {
             'BLACK': (0, 0, 0),
@@ -20,10 +20,8 @@ class Settings:
         self.SAVE_FILE = "progress.dat"
         self.screen = pygame.display.set_mode((self.SCREEN_WIDTH, self.SCREEN_HEIGHT))
 
-        # Инициализируем подсистему шрифтов pygame
         pygame.font.init()
         
-        # Используем системные шрифты
         self.font = pygame.font.SysFont("Arial", 32)
         self.title_font = pygame.font.SysFont("Arial", 48, bold=True)
     

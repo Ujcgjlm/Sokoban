@@ -5,7 +5,10 @@ import time
 from src.load_images import load_images
 from src.settings import Settings
 from src.level import Level
-from src.solver import AStarSolver
+from src.solver import DijkstraSolver
+from src.level_generator import LevelGenerator
+from src.progress import Progress
+from src.generator_settings import GeneratorSettings
 
 class Renderer:
     def __init__(self, settings):
@@ -38,19 +41,34 @@ class Menu:
         self.selected_button = 0
         self.scroll_offset = 0
         self.visible_levels = 6
+        self.level_generator = LevelGenerator()
+        self.generator_settings = GeneratorSettings(settings)
+        self.show_settings = False
 
-    def draw_main_menu(self):
+    def draw_main_menu(self, completed_levels):
         self.settings.screen.fill(self.settings.COLORS['MENU_BG'])
         title_surface = self.settings.title_font.render("Sokoban", True, self.settings.COLORS['HIGHLIGHT'])
         title_rect = title_surface.get_rect(center=(self.settings.SCREEN_WIDTH//2, 100))
         self.settings.screen.blit(title_surface, title_rect)
 
-        buttons = ["Уровни", "Выход"]
+        stats_text = f"Пройдено уровней: {completed_levels}"
+        stats_surface = self.settings.font.render(stats_text, True, self.settings.COLORS['WHITE'])
+        stats_rect = stats_surface.get_rect(center=(self.settings.SCREEN_WIDTH//2, 150))
+        self.settings.screen.blit(stats_surface, stats_rect)
+
+        if self.show_settings:
+            self.generator_settings.draw(self.settings.screen)
+            buttons = ["Сгенерировать", "Назад"]
+            button_start_y = 600
+        else:
+            buttons = ["Уровни", "Сгенерировать уровень", "Выход"]
+            button_start_y = 250
+
         for i, text in enumerate(buttons):
-            rect = pygame.Rect(0, 0, 300, 60)
-            rect.center = (self.settings.SCREEN_WIDTH//2, 250 + i*100)
+            rect = pygame.Rect(0, 0, 400, 70)
+            rect.center = (self.settings.SCREEN_WIDTH//2, button_start_y + i*100)
             color = self.settings.COLORS['HIGHLIGHT'] if i == self.selected_button else self.settings.COLORS['BUTTON_BG']
-            pygame.draw.rect(self.settings.screen, color, rect, border_radius=8)
+            pygame.draw.rect(self.settings.screen, color, rect, border_radius=12)
             text_surface = self.settings.font.render(text, True, self.settings.COLORS['WHITE'])
             text_rect = text_surface.get_rect(center=rect.center)
             self.settings.screen.blit(text_surface, text_rect)
@@ -96,6 +114,89 @@ class Menu:
         self.settings.screen.blit(controls_surface, (50, self.settings.SCREEN_HEIGHT - 60))
         pygame.display.flip()
 
+    def handle_main_menu(self, game):
+        while True:
+            self.draw_main_menu(game.progress.get_total_completed())
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    return False
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_UP:
+                        self.selected_button = max(0, self.selected_button - 1)
+                    elif event.key == pygame.K_DOWN:
+                        self.selected_button = min(len(self.get_current_buttons()) - 1, self.selected_button + 1)
+                    elif event.key == pygame.K_RETURN:
+                        result = self.handle_menu_selection(game)
+                        if result is not None:
+                            return result
+                elif event.type == pygame.MOUSEBUTTONDOWN and self.show_settings:
+                    if event.button == 1:
+                        self.generator_settings.handle_mouse_down(event.pos)
+                elif event.type == pygame.MOUSEBUTTONUP and self.show_settings:
+                    if event.button == 1:
+                        self.generator_settings.handle_mouse_up()
+                elif event.type == pygame.MOUSEMOTION and self.show_settings:
+                    self.generator_settings.handle_mouse_motion(event.pos)
+            pygame.display.flip()
+        return True
+
+    def get_current_buttons(self):
+        if self.show_settings:
+            return ["Сгенерировать", "Назад"]
+        return ["Уровни", "Сгенерировать уровень", "Выход"]
+
+    def handle_menu_selection(self, game):
+        buttons = self.get_current_buttons()
+        if buttons[self.selected_button] == "Уровни":
+            return True
+        elif buttons[self.selected_button] == "Сгенерировать уровень":
+            self.show_settings = True
+            self.selected_button = 0
+            return None
+        elif buttons[self.selected_button] == "Назад":
+            self.show_settings = False
+            self.selected_button = 1
+            return None
+        elif buttons[self.selected_button] == "Выход":
+            return False
+        elif buttons[self.selected_button] == "Сгенерировать":
+            settings = self.generator_settings.get_settings()
+            self.level_generator = LevelGenerator(settings['width'], settings['height'])
+            self.level_generator.wall_chance = settings['wall_chance']
+            self.level_generator.box_chance = settings['box_chance']
+            self.level_generator.target_chance = settings['target_chance']
+            
+            self.generator_settings.start_generation()
+            attempts = 0
+            max_attempts = 100
+            
+            while attempts < max_attempts:
+                attempts += 1
+
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        self.generator_settings.finish_generation()
+                        return False
+
+                self.draw_main_menu(game.progress.get_total_completed())
+                pygame.display.flip()
+                
+                game.current_generated_level = self.level_generator.generate()
+                temp_level = Level(game.current_generated_level)
+
+                self.generator_settings.update_solver_progress(attempts / max_attempts)
+                
+                if game.solver.solve(temp_level):
+                    print("\nСгенерирован проходимый уровень")
+                    self.generator_settings.finish_generation()
+                    return "generated"
+                print("\nУровень нерешаем, генерируем новый...")
+            
+            self.generator_settings.finish_generation()
+            print("\nНе удалось сгенерировать проходимый уровень")
+            return None
+        return True
+
 class Game:
     def __init__(self):
         pygame.init()
@@ -104,8 +205,9 @@ class Game:
         self.menu = Menu(self.settings)
         self.clock = pygame.time.Clock()
         self.levels = self.load_levels()
-        self.completed_levels = self.load_progress()
-        self.solver = AStarSolver()
+        self.progress = Progress()
+        self.solver = DijkstraSolver()
+        self.current_generated_level = None
 
     def load_levels(self):
         if not os.path.exists(self.settings.LEVELS_DIR):
@@ -117,9 +219,7 @@ class Game:
             if not filename.endswith('.txt'):
                 continue
             with open(os.path.join(self.settings.LEVELS_DIR, filename), 'r') as file:
-                # Читаем все строки и удаляем пробелы справа
                 lines = [line.rstrip() for line in file.readlines()]
-                # Удаляем пустые строки в начале и конце
                 while lines and not lines[0].strip():
                     lines.pop(0)
                 while lines and not lines[-1].strip():
@@ -128,46 +228,37 @@ class Game:
                 if not lines:
                     continue
 
-                # Находим максимальную длину строки
                 max_width = max(len(line) for line in lines)
-                # Дополняем все строки пробелами до максимальной длины
                 level = [line.ljust(max_width) for line in lines]
                 levels.append(level)
         return levels
 
-    def load_progress(self):
-        if not os.path.exists(self.settings.SAVE_FILE):
-            return set()
-        with open(self.settings.SAVE_FILE, "r") as f:
-            return set(int(line.strip()) for line in f.readlines())
-
-    def save_progress(self):
-        with open(self.settings.SAVE_FILE, "w") as f:
-            for level in self.completed_levels:
-                f.write(f"{level}\n")
-
     def handle_main_menu(self):
         while True:
-            self.menu.draw_main_menu()
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    return False
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_UP:
-                        self.menu.selected_button = max(0, self.menu.selected_button - 1)
-                    elif event.key == pygame.K_DOWN:
-                        self.menu.selected_button = min(1, self.menu.selected_button + 1)
-                    elif event.key == pygame.K_RETURN:
-                        if self.menu.selected_button == 0:
-                            return True
-                        elif self.menu.selected_button == 1:
-                            return False
-        return True
+            result = self.menu.handle_main_menu(self)
+            if result is False:
+                break
+            elif result == "generated":
+                temp_level = Level(self.current_generated_level)
+                if self.play_level(temp_level, is_generated=True):
+                    self.levels.append(self.current_generated_level)
+                continue
+
+            level_index = self.handle_level_selection()
+            if level_index == -1:
+                continue
+
+            temp_level = Level(self.levels[level_index])
+            if not self.play_level(temp_level, level_index):
+                break
+
+        pygame.quit()
+        sys.exit()
 
     def handle_level_selection(self):
         selected_level = 0
         while True:
-            self.menu.draw_level_menu(selected_level, self.completed_levels, len(self.levels))
+            self.menu.draw_level_menu(selected_level, self.progress.completed_levels, len(self.levels))
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     return -1
@@ -195,7 +286,7 @@ class Game:
             return
 
         print(f"\nНайдено решение из {len(solution)} ходов")
-        animation_delay = 200  # миллисекунды
+        animation_delay = 200
         last_move_time = 0
 
         solution_index = 0
@@ -218,14 +309,13 @@ class Game:
 
             self.settings.screen.fill(self.settings.get_backcolor())
             self.renderer.draw_level(level)
-            self.renderer.draw_status(time.time(), move_history)  # Используем текущее время, так как это анимация
+            self.renderer.draw_status(time.time(), move_history)
             pygame.display.flip()
             self.clock.tick(60)
 
         return True
 
-    def play_level(self, level_index):
-        level = Level(self.levels[level_index])
+    def play_level(self, level, level_index=None, is_generated=False):
         move_history = []
         start_time = time.time()
         move_key_delay = 100
@@ -233,7 +323,8 @@ class Game:
         undo_key_delay = 80
         last_undo_time = 0
 
-        print(f"\nНачинаем уровень {level_index + 1}")
+        level_name = "Сгенерированный" if is_generated else f"Level {level_index + 1}"
+        print(f"\nНачинаем уровень {level_name}")
 
         while True:
             current_time = pygame.time.get_ticks()
@@ -266,7 +357,7 @@ class Game:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_r:
                         print("\nПерезапуск уровня")
-                        level = Level(self.levels[level_index])
+                        level = Level(level.data)
                         move_history.clear()
                         start_time = time.time()
                     elif event.key == pygame.K_s:
@@ -285,11 +376,13 @@ class Game:
 
             if level.check_win():
                 elapsed_time = int(time.time() - start_time)
-                print(f"\nУровень {level_index + 1} пройден!")
+                print(f"\nУровень {level_name} пройден!")
                 print(f"Время прохождения: {elapsed_time} секунд")
                 print(f"Количество ходов: {level.moves_count}")
-                self.completed_levels.add(level_index)
-                self.save_progress()
+                if is_generated:
+                    self.progress.add_completed_generated()
+                else:
+                    self.progress.add_completed_level(level_index)
                 return True
 
             self.settings.screen.fill(self.settings.get_backcolor())
@@ -298,26 +391,7 @@ class Game:
             pygame.display.flip()
             self.clock.tick(60)
 
-    def run(self):
-        if not self.levels:
-            print("No levels to load. Please check the 'levels' directory.")
-            return
-
-        while True:
-            if not self.handle_main_menu():
-                break
-
-            level_index = self.handle_level_selection()
-            if level_index == -1:
-                continue
-
-            if not self.play_level(level_index):
-                break
-
-        pygame.quit()
-        sys.exit()
-
 if __name__ == "__main__":
     os.makedirs(Settings().LEVELS_DIR, exist_ok=True)
     game = Game()
-    game.run()
+    game.handle_main_menu()

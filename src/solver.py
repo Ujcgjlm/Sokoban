@@ -2,7 +2,7 @@ from queue import PriorityQueue
 
 from src.level import Level
 
-class AStarSolver:
+class DijkstraSolver:
     def __init__(self):
         self.visited = set()
         self.pq = PriorityQueue()
@@ -42,6 +42,6 @@ class AStarSolver:
 
 if __name__ == "__main__":
     level = Level.from_file("levels/level02.txt")
-    solver = AStarSolver()
+    solver = DijkstraSolver()
     solution = solver.solve(level)
     print(solution)

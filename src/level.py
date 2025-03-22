@@ -1,14 +1,11 @@
 class Level:
     def __init__(self, level_data):
-        # Убеждаемся, что все строки одинаковой длины
         max_width = max(len(row) for row in level_data)
         self.data = [row.ljust(max_width) for row in level_data]
         self.width = max_width
         self.height = len(self.data)
         self.find_player()
         self.moves_count = 0
-        # print("\nНачальное состояние уровня:")
-        # self.print_board()
 
     def print_board(self):
         """Выводит текущее состояние доски в консоль"""
@@ -33,7 +30,7 @@ class Level:
     def get_tile(self, x, y):
         if 0 <= y < self.height and 0 <= x < self.width:
             return self.data[y][x]
-        return '#'  # За пределами уровня считаем стену
+        return '#'
 
     def move_player(self, dx, dy):
         if not self.player_pos:
@@ -53,9 +50,7 @@ class Level:
 
         new_data = [list(row) for row in self.data]
 
-        # Случай 1: Впереди ящик
         if next_tile in "$*":
-            # Проверяем, можно ли его толкнуть
             if next_next_tile in box_to:
                 new_data[py][px] = p_from[current]
                 new_data[ny][nx] = p_to[next_tile]
@@ -63,20 +58,16 @@ class Level:
                 self.data = [''.join(row) for row in new_data]
                 self.player_pos = (nx, ny)
                 self.moves_count += 1
-                # print(f"\nХод {self.moves_count}: Толкаем ящик {(nx, ny)} -> {(nnx, nny)}")
-                # self.print_board()
                 return True
             return False
 
-        # Случай 2: Впереди пустое место или цель
+
         if next_tile in " .":
             new_data[py][px] = p_from[current]
             new_data[ny][nx] = p_to[next_tile]
             self.data = [''.join(row) for row in new_data]
             self.player_pos = (nx, ny)
             self.moves_count += 1
-            # print(f"\nХод {self.moves_count}: Перемещение {(px, py)} -> {(nx, ny)}")
-            # self.print_board()
             return True
 
         return False
